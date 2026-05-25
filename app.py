@@ -1,49 +1,61 @@
 import cv2
 import os
+from ultralytics import YOLO  # Neden yazıldı?: YOLO modelini projemize dahil etmek için
 
-# Neden yazıldı?: Okuyacağımız video dosyasının bilgisayardaki yolunu belirtiyoruz.
 VIDEO_PATH = os.path.join("videos", "test_video.mp4")
 
 def main():
-    # Neden yazıldı?: Belirttiğimiz video dosyasını mevcut mu diye kontrol ediyoruz.
     if not os.path.exists(VIDEO_PATH):
         print(f"Hata: '{VIDEO_PATH}' konumunda video dosyası bulunamadı!")
-        print("Lütfen 'videos' klasörünün içine 'test_video.mp4' dosyasını ekleyin.")
         return
 
-    # Neden yazıldı?: Video dosyasından kare kare görüntü akışını başlatmak için.
+    # Neden yazıldı?: COCO veri setiyle önceden eğitilmiş hazır YOLOv8 nano modelini yüklüyoruz.
+    # İlk çalıştırmada internetten otomatik olarak 'yolov8n.pt' dosyasını indirecektir (yaklaşık 6MB).
+    model = YOLO("yolov8n.pt") 
+
     cap = cv2.VideoCapture(VIDEO_PATH)
-    
-    # Neden yazıldı?: Videonun saniyede kaç kare (FPS) oynatıldığını alıyoruz. 
-    # Bu sayede videoyu kendi hızında oynatabileceğiz.
     fps = cap.get(cv2.CAP_PROP_FPS)
     delay = int(1000 / fps) if fps > 0 else 30
 
-    print(f"Video başarıyla yüklendi ({fps} FPS). İzlemek için bekleniyor...")
+    print("YOLO Modeli yüklendi. İnsan tespiti başlıyor...")
 
-    # Neden yazıldı?: Video bitene kadar tüm kareleri döngüyle tek tek okuyoruz.
     while cap.isOpened():
         ret, frame = cap.read()
-        
-        # Neden yazıldı?: Eğer ret False dönerse video bitmiş demektir, döngüden çıkıyoruz.
         if not ret:
-            print("Video akışı başarıyla tamamlandı.")
             break
 
-        # --- BURASI GELECEKTEKİ ADIMLARIMIZIN YERİ ---
-        # TODO: Aşama 2 - YOLO ile insan tespiti (Detection) burada yapılacak.
-        # TODO: Aşama 3 - Giriş/Çıkış takibi (Tracking) burada yapılacak.
-        # ---------------------------------------------
+        # Neden yazıldı?: Alınan anlık kareyi (frame) YOLO yapay zeka modeline gönderiyoruz.
+        # stream=True yaparak videonun belleği şişirmesini engelliyoruz.
+        results = model(frame, stream=True)
 
-        # Neden yazıldı?: Üzerinde analiz yapacağımız o anki video karesini ekranda gösteriyoruz.
-        cv2.imshow("Magaza / Alan Yogunluk Takip Sistemi", frame)
+        # Neden yazıldı?: Modelin bulduğu sonuçları (kutuları, sınıfları) tek tek dönüyoruz.
+        for r in results:
+            boxes = r.boxes
+            for box in boxes:
+                # Neden yazıldı?: Bulunan nesnenin sınıf numarasını alıyoruz (Örn: COCO veri setinde İnsan = 0)
+                cls = int(box.cls[0])
+                
+                # Eğer tespit edilen nesne bir İNSAN (0) ise ekrana çizdireceğiz
+                if cls == 0:
+                    # Neden yazıldı?: İnsanın etrafındaki kutunun koordinatlarını alıyoruz (X1, Y1, X2, Y2)
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    
+                    # Neden yazıldı?: Güven skorunu alıyoruz (Yapay zeka % kaç ihtimalle bunun insan olduğunu düşünüyor?)
+                    conf = float(box.conf[0])
 
-        # Neden yazıldı?: Videoyu gerçek hızında oynatmak ve 'q' tuşuna basılırsa kapatmak için.
+                    # Neden yazıldı?: İnsanın etrafına yeşil bir dikdörtgen çiziyoruz
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    
+                    # Neden yazıldı?: Kutunun üzerine güven skorunu yazdırıyoruz (Örn: Person 0.85)
+                    label = f"Person: {conf:.2f}"
+                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        # Sonucu ekranda göster
+        cv2.imshow("Magaza / Alan Yogunluk Takip Sistemi - YOLO Detection", frame)
+
         if cv2.waitKey(delay) & 0xFF == ord('q'):
-            print("Kullanıcı tarafından video kapatıldı.")
             break
 
-    # Neden yazıldı?: Video bittiğinde belleği temizlemek ve pencereyi kapatmak için.
     cap.release()
     cv2.destroyAllWindows()
 
