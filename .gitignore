@@ -1,0 +1,11 @@
+# Python geçici dosyaları
+__pycache__/
+*.pyc
+
+# Sanal ortam (Virtual Environment) klasörü
+venv/
+.venv/
+
+# Büyük veri ve video dosyaları 
+*.mp4
+*.avi
