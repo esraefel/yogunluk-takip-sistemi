@@ -7,10 +7,67 @@ VIDEO_PATH = os.path.join("videos", "test_video.mp4")
 def main():
     if not os.path.exists(VIDEO_PATH):
         print(f"Hata: '{VIDEO_PATH}' konumunda video dosyası bulunamadı!")
+        returnimport cv2
+import os
+from ultralytics import YOLO
+
+VIDEO_PATH = os.path.join("videos", "test_video.mp4")
+
+def main():
+    if not os.path.exists(VIDEO_PATH):
+        print(f"Hata: '{VIDEO_PATH}' konumunda video dosyası bulunamadı!")
         return
 
-    # Neden yazıldı?: COCO veri setiyle önceden eğitilmiş hazır YOLOv8 nano modelini yüklüyoruz.
-    # İlk çalıştırmada internetten otomatik olarak 'yolov8n.pt' dosyasını indirecektir (yaklaşık 6MB).
+    model = YOLO("yolov8n.pt") 
+
+    cap = cv2.VideoCapture(VIDEO_PATH)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    delay = int(1000 / fps) if fps > 0 else 30
+
+    print("YOLO ve Tracking Motoru aktif edildi...")
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+
+        results = model.track(frame, persist=True, tracker="bytetrack.yaml", stream=True)
+
+        for r in results:
+            boxes = r.boxes
+            if r.boxes.id is not None:
+                track_ids = r.boxes.id.int().tolist()
+                
+                for box, track_id in zip(boxes, track_ids):
+                    cls = int(box.cls[0])
+                    
+                    # Sadece insanları (0) takip et
+                    if cls == 0:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        
+                        # Neden yazıldı?: Dikdörtgenin rengini her insan için ID'sine göre dinamik yapıyoruz
+                        # Böylece herkesin kutu rengi farklı görünecek (Takip görsel kalitesi için)
+                        color = (int((track_id * 40) % 255), 255, int((track_id * 80) % 255))
+
+                        # İnsanın etrafına kutu çiz
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        
+                        # Neden yazıldı?: Kutunun üzerine "ID: 1", "ID: 2" şeklinde benzersiz kimliği yazdırıyoruz.
+                        label = f"ID: {track_id}"
+                        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+        cv2.imshow("Magaza / Alan Yogunluk Takip Sistemi - Tracking", frame)
+
+        if cv2.waitKey(delay) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+
     model = YOLO("yolov8n.pt") 
 
     cap = cv2.VideoCapture(VIDEO_PATH)
