@@ -4,14 +4,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
-import sqlite3  # Neden yazıldı?: SQLite veritabanı işlemleri için
-import json     # Neden yazıldı?: JSON raporu üretmek için
-import logging  # Neden yazıldı?: Sistemin ayak izlerini loglamak için
+import sqlite3
+import json
+import logging
 from datetime import datetime
 from ultralytics import YOLO
 
-# --- AŞAMA 8: LOGGING & ERROR HANDLING CONFIGURATION ---
-# Neden yazıldı?: Sistemdeki tüm olayları tarih ve saatle 'sistem.log' dosyasına kaydeder.
 logging.basicConfig(
     filename="sistem.log",
     level=logging.INFO,
@@ -40,8 +38,6 @@ with col2:
     stats_placeholder = st.empty()
     chart_placeholder = st.empty()
 
-# --- AŞAMA 6: DATABASE (VERİTABANI) KURULUMU ---
-# Neden yazıldı?: Veritabanı dosyasını oluşturur ve yoksa 'raporlar' tablosunu hazırlar.
 def veritabanini_hazirla():
     try:
         conn = sqlite3.connect("yogunluk.db")
@@ -126,7 +122,6 @@ if start_system and os.path.exists(VIDEO_PATH):
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             FRAME_WINDOW.image(frame_rgb)
 
-            # Modern Arayüz Kartları
             with stats_placeholder.container():
                 st.markdown(f"""
                 <div style="display: flex; justify-content: space-between; background-color: #ffffff; padding: 15px; border: 1px solid #e6e9ef; border-radius: 8px;">
@@ -142,7 +137,6 @@ if start_system and os.path.exists(VIDEO_PATH):
                 <div style="margin-bottom: 20px;"></div>
                 """, unsafe_allow_html=True)
 
-            # Dinamik Kırpışmasız Grafik Güncellemesi
             df_data = pd.DataFrame({
                 "Aktivite": ["Giriş", "Çıkış"],
                 "Kişi Sayısı": [st.session_state.in_count, st.session_state.out_count]
@@ -152,10 +146,8 @@ if start_system and os.path.exists(VIDEO_PATH):
 
         cap.release()
 
-        # --- VİDEO BİTTİĞİNDE ÇALIŞACAK KURUMSAL ADIMLAR ---
         su_an = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # AŞAMA 6: VERİLERİ VERİTABANINA KAYDETME
         conn = sqlite3.connect("yogunluk.db")
         cursor = conn.cursor()
         cursor.execute("INSERT INTO raporlar (tarih_saat, giris_sayisi, cikis_sayisi) VALUES (?, ?, ?)", 
@@ -164,18 +156,15 @@ if start_system and os.path.exists(VIDEO_PATH):
         conn.close()
         logging.info("Günlük sayım verileri başarıyla SQLite veritabanına kaydedildi.")
 
-        # AŞAMA 7: JSON VE CSV RAPORU ÜRETME
         rapor_veri = {
             "tarih_saat": su_an,
             "toplam_giris": st.session_state.in_count,
             "toplam_cikis": st.session_state.out_count
         }
         
-        # JSON Çıktısı
         with open("gunluk_rapor.json", "w", encoding="utf-8") as f:
             json.dump(rapor_veri, f, ensure_ascii=False, indent=4)
             
-        # CSV Çıktısı
         df_csv = pd.DataFrame([rapor_veri])
         df_csv.to_csv("gunluk_rapor.csv", index=False, encoding="utf-8")
         
