@@ -1,0 +1,20 @@
+2026-05-26 06:56:32,314 - INFO - Veritabanı bağlantısı başarıyla kuruldu ve tablolar doğrulandı.
+2026-05-26 06:56:35,077 - INFO - Veritabanı bağlantısı başarıyla kuruldu ve tablolar doğrulandı.
+2026-05-26 06:56:35,080 - INFO - Kullanıcı sistemi başlattı. Görüntü işleme döngüsüne giriliyor.
+2026-05-26 06:56:36,380 - INFO - Yeni Giriş Algılandı! ID: 1 - Toplam Giriş: 1
+2026-05-26 06:56:36,380 - INFO - Yeni Giriş Algılandı! ID: 3 - Toplam Giriş: 2
+2026-05-26 06:56:36,380 - INFO - Yeni Giriş Algılandı! ID: 4 - Toplam Giriş: 3
+2026-05-26 06:56:42,711 - INFO - Yeni Giriş Algılandı! ID: 35 - Toplam Giriş: 4
+2026-05-26 06:56:50,005 - INFO - Yeni Giriş Algılandı! ID: 65 - Toplam Giriş: 5
+2026-05-26 06:57:05,203 - INFO - Yeni Giriş Algılandı! ID: 157 - Toplam Giriş: 6
+2026-05-26 06:57:07,613 - INFO - Yeni Çıkış Algılandı! ID: 161 - Toplam Çıkış: 1
+2026-05-26 06:57:43,148 - INFO - Yeni Çıkış Algılandı! ID: 379 - Toplam Çıkış: 2
+2026-05-26 06:57:46,967 - INFO - Yeni Giriş Algılandı! ID: 399 - Toplam Giriş: 7
+2026-05-26 06:57:49,619 - INFO - Yeni Giriş Algılandı! ID: 414 - Toplam Giriş: 8
+2026-05-26 06:58:10,175 - INFO - Yeni Giriş Algılandı! ID: 524 - Toplam Giriş: 9
+2026-05-26 06:58:13,649 - INFO - Yeni Giriş Algılandı! ID: 550 - Toplam Giriş: 10
+2026-05-26 06:58:20,924 - INFO - Yeni Giriş Algılandı! ID: 581 - Toplam Giriş: 11
+2026-05-26 06:58:59,357 - INFO - Yeni Giriş Algılandı! ID: 740 - Toplam Giriş: 12
+2026-05-26 06:59:23,371 - INFO - Video dosyası bitti veya akış durdu.
+2026-05-26 06:59:23,389 - INFO - Günlük sayım verileri başarıyla SQLite veritabanına kaydedildi.
+2026-05-26 06:59:23,409 - INFO - gunluk_rapor.json ve gunluk_rapor.csv başarıyla oluşturuldu.
