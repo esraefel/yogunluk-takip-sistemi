@@ -1,120 +1,129 @@
 import cv2
 import os
-from ultralytics import YOLO  # Neden yazıldı?: YOLO modelini projemize dahil etmek için
-
-VIDEO_PATH = os.path.join("videos", "test_video.mp4")
-
-def main():
-    if not os.path.exists(VIDEO_PATH):
-        print(f"Hata: '{VIDEO_PATH}' konumunda video dosyası bulunamadı!")
-        returnimport cv2
-import os
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import numpy as np
 from ultralytics import YOLO
 
+st.set_page_config(page_title="Alan Yoğunluk Dashboard", layout="wide")
+
+st.title("📊 Gerçek Zamanlı Alan Kullanım ve Yoğunluk Takibi")
+st.sidebar.header("Sistem Ayarları")
+
 VIDEO_PATH = os.path.join("videos", "test_video.mp4")
 
-def main():
-    if not os.path.exists(VIDEO_PATH):
-        print(f"Hata: '{VIDEO_PATH}' konumunda video dosyası bulunamadı!")
-        return
+if "in_count" not in st.session_state:
+    st.session_state.in_count = 0
+if "out_count" not in st.session_state:
+    st.session_state.out_count = 0
 
-    model = YOLO("yolov8n.pt") 
+col1, col2 = st.columns([2, 1])
 
+with col1:
+    st.subheader("📹 Canlı Analiz Akışı")
+    FRAME_WINDOW = st.image([]) 
+
+with col2:
+    st.subheader("📈 Anlık İstatistikler")
+    
+    stats_placeholder = st.empty()
+    chart_placeholder = st.empty()
+
+start_system = st.sidebar.button("Sistemi Başlat")
+
+if start_system and os.path.exists(VIDEO_PATH):
+    model = YOLO("yolov8n.pt")
     cap = cv2.VideoCapture(VIDEO_PATH)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    delay = int(1000 / fps) if fps > 0 else 30
-
-    print("YOLO ve Tracking Motoru aktif edildi...")
+    
+    # Sağ taraftaki kapı koordinatları
+    POLYGON_POINTS = np.array([[380, 480], [640, 480], [640, 280], [450, 280]], np.int32)
+    
+    track_history = {}  
+    already_counted = set() 
+    frame_count = 0 
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
+        frame_count += 1 
+        if frame_count % 3 != 0:
+            continue
 
-        results = model.track(frame, persist=True, tracker="bytetrack.yaml", stream=True)
+        frame = cv2.resize(frame, (640, 480))
+
+        # İsteğin üzerine: Yazı sadece "GIRIS / CIKIS" olarak güncellendi
+        cv2.polylines(frame, [POLYGON_POINTS], isClosed=True, color=(255, 0, 0), thickness=2)
+        cv2.putText(frame, "GIRIS / CIKIS", (390, 270), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+        results = model.track(frame, persist=True, tracker="bytetrack.yaml", stream=True, verbose=False)
 
         for r in results:
-            boxes = r.boxes
             if r.boxes.id is not None:
                 track_ids = r.boxes.id.int().tolist()
-                
+                boxes = r.boxes
+
                 for box, track_id in zip(boxes, track_ids):
-                    cls = int(box.cls[0])
-                    
-                    # Sadece insanları (0) takip et
-                    if cls == 0:
+                    if int(box.cls[0]) == 0: 
                         x1, y1, x2, y2 = map(int, box.xyxy[0])
                         
-                        # Neden yazıldı?: Dikdörtgenin rengini her insan için ID'sine göre dinamik yapıyoruz
-                        # Böylece herkesin kutu rengi farklı görünecek (Takip görsel kalitesi için)
-                        color = (int((track_id * 40) % 255), 255, int((track_id * 80) % 255))
-
-                        # İnsanın etrafına kutu çiz
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        cx = int((x1 + x2) / 2)
+                        cy = int((y1 + y2) / 2)
                         
-                        # Neden yazıldı?: Kutunun üzerine "ID: 1", "ID: 2" şeklinde benzersiz kimliği yazdırıyoruz.
-                        label = f"ID: {track_id}"
-                        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
 
-        cv2.imshow("Magaza / Alan Yogunluk Takip Sistemi - Tracking", frame)
+                        is_inside = cv2.pointPolygonTest(POLYGON_POINTS, (cx, cy), False)
 
-        if cv2.waitKey(delay) & 0xFF == ord('q'):
-            break
+                        # --- DOĞRULANMIŞ GİRİŞ / ÇIKIŞ MANTIĞI ---
+                        if track_id not in track_history:
+                            # Kişinin ilk belirdiği konumu hafızaya al
+                            track_history[track_id] = "inside" if is_inside >= 0 else "outside"
+                            
+                            # Kural 1: Eğer kişi İLK DEFA kapı alanının İÇİNDE belirmişse, dışarıdan gelmiştir -> GİRİŞ
+                            if is_inside >= 0 and track_id not in already_counted:
+                                st.session_state.in_count += 1
+                                already_counted.add(track_id)
 
-    cap.release()
-    cv2.destroyAllWindows()
+                        prev_state = track_history[track_id]
 
-if __name__ == "__main__":
-    main()
+                        # Kural 2: Eğer kişi daha önce dışarıdaydı (mağazadaydı) ve ŞİMDİ kapı alanının içine girdiyse -> ÇIKIŞ
+                        if prev_state == "outside" and is_inside >= 0 and track_id not in already_counted:
+                            st.session_state.out_count += 1
+                            already_counted.add(track_id)
 
-    model = YOLO("yolov8n.pt") 
+                        # Durumu güncelle
+                        track_history[track_id] = "inside" if is_inside >= 0 else "outside"
 
-    cap = cv2.VideoCapture(VIDEO_PATH)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    delay = int(1000 / fps) if fps > 0 else 30
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.putText(frame, f"ID: {track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-    print("YOLO Modeli yüklendi. İnsan tespiti başlıyor...")
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        FRAME_WINDOW.image(frame_rgb)
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+        # --- YENİ MODERN VE SADE TASARIM ---
+        # Emojiler kaldırıldı, renkler netleştirildi, "Bölge" kelimesi silindi.
+        with stats_placeholder.container():
+            st.markdown(f"""
+            <div style="display: flex; justify-content: space-between; background-color: #ffffff; padding: 15px; border: 1px solid #e6e9ef; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <div style="text-align: center; flex: 1;">
+                    <div style="font-size: 14px; font-weight: 600; color: #666; text-transform: uppercase;">Giriş</div>
+                    <div style="font-size: 36px; font-weight: bold; color: #1f77b4; margin-top: 5px;">{st.session_state.in_count}</div>
+                </div>
+                <div style="text-align: center; flex: 1; border-left: 1px solid #e6e9ef;">
+                    <div style="font-size: 14px; font-weight: 600; color: #666; text-transform: uppercase;">Çıkış</div>
+                    <div style="font-size: 36px; font-weight: bold; color: #ff7f0e; margin-top: 5px;">{st.session_state.out_count}</div>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;"></div>
+            """, unsafe_allow_html=True)
 
-        # Neden yazıldı?: Alınan anlık kareyi (frame) YOLO yapay zeka modeline gönderiyoruz.
-        # stream=True yaparak videonun belleği şişirmesini engelliyoruz.
-        results = model(frame, stream=True)
-
-        # Neden yazıldı?: Modelin bulduğu sonuçları (kutuları, sınıfları) tek tek dönüyoruz.
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                # Neden yazıldı?: Bulunan nesnenin sınıf numarasını alıyoruz (Örn: COCO veri setinde İnsan = 0)
-                cls = int(box.cls[0])
-                
-                # Eğer tespit edilen nesne bir İNSAN (0) ise ekrana çizdireceğiz
-                if cls == 0:
-                    # Neden yazıldı?: İnsanın etrafındaki kutunun koordinatlarını alıyoruz (X1, Y1, X2, Y2)
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    
-                    # Neden yazıldı?: Güven skorunu alıyoruz (Yapay zeka % kaç ihtimalle bunun insan olduğunu düşünüyor?)
-                    conf = float(box.conf[0])
-
-                    # Neden yazıldı?: İnsanın etrafına yeşil bir dikdörtgen çiziyoruz
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    
-                    # Neden yazıldı?: Kutunun üzerine güven skorunu yazdırıyoruz (Örn: Person 0.85)
-                    label = f"Person: {conf:.2f}"
-                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-        # Sonucu ekranda göster
-        cv2.imshow("Magaza / Alan Yogunluk Takip Sistemi - YOLO Detection", frame)
-
-        if cv2.waitKey(delay) & 0xFF == ord('q'):
-            break
+        df_data = pd.DataFrame({
+            "Aktivite": ["Giriş", "Çıkış"],
+            "Kişi Sayısı": [st.session_state.in_count, st.session_state.out_count]
+        })
+        fig = px.bar(df_data, x="Aktivite", y="Kişi Sayısı", color="Aktivite", range_y=[0, max(15, st.session_state.in_count + 5)])
+        chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"density_chart_{frame_count}")
 
     cap.release()
-    cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    main()
